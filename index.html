@@ -48,7 +48,12 @@
   }
   .brand .dot svg{width:18px;height:18px;}
   .brand h1{font-size:16.5px;font-weight:600;margin:0;letter-spacing:-0.01em;}
-  .brand p{margin:1px 0 0;font-size:12px;color:var(--text-dim);}
+  .brand p{margin:1px 0 0;font-size:12px;color:var(--text-dim); display:flex; align-items:center; gap:6px;}
+  .conn-dot{width:6px;height:6px;border-radius:50%; background:var(--text-faint); flex-shrink:0;}
+  .conn-dot.ok{background:var(--green);}
+  .conn-dot.bad{background:var(--red);}
+
+  .top-right{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
   .stats{display:flex; gap:10px; flex-wrap:wrap;}
   .stat-chip{
     background:var(--panel); border:1px solid var(--border-soft); border-radius:9px;
@@ -56,6 +61,14 @@
   }
   .stat-chip b{color:var(--text); font-weight:600;}
   .stat-chip .sw{width:7px;height:7px;border-radius:50%; flex-shrink:0;}
+
+  .sql-trigger{
+    display:flex; align-items:center; gap:7px; background:var(--panel); border:1px solid var(--border-soft);
+    border-radius:9px; padding:8px 13px; font-size:12px; color:var(--text-dim); cursor:pointer;
+    font-family:inherit; transition:border-color .15s, color .15s;
+  }
+  .sql-trigger:hover{border-color:#3a3e3a; color:var(--text);}
+  .sql-trigger svg{width:14px;height:14px;}
 
   .grid{
     max-width:1180px; margin:0 auto;
@@ -143,7 +156,9 @@
     max-width:1180px; margin:60px auto; text-align:center; color:var(--text-dim);
   }
   .empty h2{color:var(--text); font-size:17px; margin-bottom:6px;}
-  .empty p{font-size:13px; max-width:380px; margin:0 auto;}
+  .empty p{font-size:13px; max-width:400px; margin:0 auto;}
+
+  .loading-row{max-width:1180px; margin:60px auto; text-align:center; color:var(--text-dim); font-size:13px;}
 
   /* Bulk update FAB */
   .fab{
@@ -170,6 +185,7 @@
     width:100%; max-width:440px; padding:24px; max-height:88vh; overflow-y:auto;
     box-shadow:0 30px 70px -20px rgba(0,0,0,0.7);
   }
+  .modal.wide{max-width:560px;}
   .modal h3{margin:0 0 4px; font-size:16px; font-weight:650;}
   .modal .sub{font-size:12.5px; color:var(--text-dim); margin:0 0 20px;}
   .field{margin-bottom:14px;}
@@ -185,10 +201,12 @@
   .modal-actions{display:flex; gap:10px; margin-top:20px;}
   .modal-actions .btn{flex:1; padding:11px;}
 
+  .sql-block-label{font-size:12px; font-weight:600; color:var(--text-dim); margin:18px 0 6px;}
+  .sql-block-label:first-of-type{margin-top:0;}
   .sql-box{
     background:var(--bg); border:1px solid var(--border-soft); border-radius:10px;
     padding:13px 14px; font-family:var(--mono); font-size:11.3px; line-height:1.6;
-    color:#a6f0cc; white-space:pre-wrap; word-break:break-word; margin-top:6px; position:relative;
+    color:#a6f0cc; white-space:pre-wrap; word-break:break-word; position:relative;
   }
   .copy-btn{
     position:absolute; top:8px; right:8px; background:var(--panel); border:1px solid var(--border);
@@ -218,19 +236,26 @@
       </div>
       <div>
         <h1>Keepalive</h1>
-        <p>Supabase projelerin uyanık kalsın</p>
+        <p><span class="conn-dot" id="connDot"></span><span id="connLabel">bağlanıyor…</span></p>
       </div>
     </div>
-    <div class="stats" id="statsRow"></div>
+    <div class="top-right">
+      <div class="stats" id="statsRow"></div>
+      <button class="sql-trigger" onclick="openSqlModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><path d="M8 9l-3 3 3 3M16 9l3 3-3 3M13 6l-2 12"/></svg>
+        SQL
+      </button>
+    </div>
   </div>
 
-  <div class="grid" id="grid"></div>
+  <div class="grid" id="grid" style="display:none;"></div>
+  <div class="loading-row" id="loadingState">Supabase'e bağlanılıyor…</div>
   <div class="empty" id="emptyState" style="display:none;">
     <h2>Henüz proje yok</h2>
-    <p>Sağ üstteki + kartına tıkla, Supabase proje ID'n ve API anahtarını gir, sayaç başlasın.</p>
+    <p>Sağ üstteki + kartına tıkla, izlemek istediğin Supabase proje ID'n ve API anahtarını gir. Bu uygulamanın verileri de kendi Supabase projende saklanır — sağ üstteki SQL butonundan tabloyu oluşturman gerekiyor.</p>
   </div>
 
-  <div class="footer-note">Veriler yalnızca bu tarayıcıda, cihazında saklanır. API anahtarların hiçbir yere gönderilmez — yalnızca kendi Supabase projene istek atmak için kullanılır.</div>
+  <div class="footer-note">Bu panelin verileri (proje listeni) kendi Supabase projende <b>tracked_apps</b> tablosunda saklanır — tarayıcıda hiçbir şey tutulmaz.</div>
 
   <button class="fab" id="bulkBtn" onclick="bulkUpdate()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6"/></svg>
@@ -241,7 +266,7 @@
   <div class="overlay" id="addOverlay">
     <div class="modal">
       <h3 id="modalTitle">Yeni proje ekle</h3>
-      <p class="sub">Proje ID ve API anahtarı sadece bu cihazda saklanır.</p>
+      <p class="sub">İzlenecek Supabase projenin bilgilerini gir.</p>
 
       <div class="field">
         <label>Uygulama adı</label>
@@ -253,16 +278,49 @@
         <div class="hint">Proje ayarları → General → Reference ID. (xyz.supabase.co içindeki "xyz" kısmı)</div>
       </div>
       <div class="field">
-        <label>API Key (anon veya service_role)</label>
-        <input type="text" id="fApiKey" placeholder="eyJhbGciOi...">
+        <label>API Key (anon / publishable / service_role)</label>
+        <input type="text" id="fApiKey" placeholder="eyJhbGciOi... veya sb_publishable_...">
       </div>
       <div class="field">
         <label>Tablo adı</label>
         <input type="text" id="fTable" placeholder="keepalive" value="keepalive">
-        <div class="hint">Aşağıdaki SQL'i Supabase → SQL Editor'da çalıştırıp tabloyu bir kere oluştur.</div>
+        <div class="hint">O projede bu tablo yoksa SQL butonundaki "izlenen proje" script'ini orada çalıştır.</div>
       </div>
 
-      <div class="sql-box" id="sqlBox">create table if not exists public.keepalive (
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">Vazgeç</button>
+        <button class="btn primary" id="saveBtn" onclick="saveApp()">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SQL modal -->
+  <div class="overlay" id="sqlOverlay">
+    <div class="modal wide">
+      <h3>SQL script'leri</h3>
+      <p class="sub">İki ayrı script var: biri bu panelin kendi verisini tutan proje için, diğeri izlediğin her proje için.</p>
+
+      <div class="sql-block-label">1) Bu panelin kendi Supabase projesinde bir kere çalıştır (uqdiiuqpkvqxunxthpbj)</div>
+      <div class="sql-box" id="sqlBoxConfig">create table if not exists public.tracked_apps (
+  id bigint generated by default as identity primary key,
+  name text not null,
+  project_id text not null,
+  api_key text not null,
+  table_name text not null default 'keepalive',
+  last_updated timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+alter table public.tracked_apps enable row level security;
+
+create policy "tracked_apps allow all"
+on public.tracked_apps for all
+using (true) with check (true);
+        <button class="copy-btn" onclick="copySql('sqlBoxConfig')">Kopyala</button>
+      </div>
+
+      <div class="sql-block-label">2) İzlediğin her projede bir kere çalıştır (uyandırma tablosu)</div>
+      <div class="sql-box" id="sqlBoxTracked">create table if not exists public.keepalive (
   id bigint generated by default as identity primary key,
   created_at timestamptz not null default now()
 );
@@ -272,12 +330,11 @@ alter table public.keepalive enable row level security;
 create policy "keepalive allow all"
 on public.keepalive for all
 using (true) with check (true);
-        <button class="copy-btn" onclick="copySql()">Kopyala</button>
+        <button class="copy-btn" onclick="copySql('sqlBoxTracked')">Kopyala</button>
       </div>
 
       <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">Vazgeç</button>
-        <button class="btn primary" onclick="saveApp()">Kaydet</button>
+        <button class="btn" style="flex:1" onclick="closeSqlModal()">Kapat</button>
       </div>
     </div>
   </div>
@@ -285,41 +342,84 @@ using (true) with check (true);
   <div class="toast-wrap" id="toastWrap"></div>
 
 <script>
-const STORAGE_KEY = 'keepalive_apps_v1';
+// ---- Bu panelin KENDİ verisini sakladığı Supabase projesi ----
+const CONFIG_URL = 'https://uqdiiuqpkvqxunxthpbj.supabase.co';
+const CONFIG_KEY = 'sb_publishable_OVeHJcQu0baBolEmE7JTmw_TZd74LNs';
+const CONFIG_TABLE = 'tracked_apps';
+const CONFIG_REST = `${CONFIG_URL}/rest/v1/${CONFIG_TABLE}`;
+const configHeaders = {
+  'apikey': CONFIG_KEY,
+  'Authorization': `Bearer ${CONFIG_KEY}`,
+  'Content-Type': 'application/json',
+};
+
 let apps = [];
 let editingId = null;
-let openMenuId = null;
 
-function loadApps(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    apps = raw ? JSON.parse(raw) : [];
-  }catch(e){ apps = []; }
-}
-function persist(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(apps));
+// ---------- Config-store CRUD (kendi verimiz) ----------
+async function fetchApps(){
+  const res = await fetch(`${CONFIG_REST}?select=*&order=created_at.asc`, { headers: configHeaders });
+  if(!res.ok){
+    const txt = await res.text();
+    throw new Error(`(${res.status}) ${txt.slice(0,140)}`);
+  }
+  return res.json();
 }
 
+async function insertAppRow(payload){
+  const res = await fetch(CONFIG_REST, {
+    method:'POST',
+    headers: {...configHeaders, 'Prefer':'return=representation'},
+    body: JSON.stringify(payload)
+  });
+  if(!res.ok) throw new Error(await res.text());
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
+async function updateAppRow(id, patch){
+  const res = await fetch(`${CONFIG_REST}?id=eq.${id}`, {
+    method:'PATCH',
+    headers: {...configHeaders, 'Prefer':'return=representation'},
+    body: JSON.stringify(patch)
+  });
+  if(!res.ok) throw new Error(await res.text());
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
+async function deleteAppRow(id){
+  const res = await fetch(`${CONFIG_REST}?id=eq.${id}`, { method:'DELETE', headers: configHeaders });
+  if(!res.ok) throw new Error(await res.text());
+}
+
+// ---------- Helpers ----------
 function daysLeft(app){
-  const last = new Date(app.lastUpdated);
+  const last = new Date(app.last_updated);
   const now = new Date();
-  const elapsedMs = now - last;
-  const elapsedDays = elapsedMs / (1000*60*60*24);
-  const left = 7 - elapsedDays;
-  return left;
+  const elapsedDays = (now - last) / (1000*60*60*24);
+  return 7 - elapsedDays;
 }
-
 function fmtDate(iso){
   const d = new Date(iso);
   return d.toLocaleDateString('tr-TR', {day:'2-digit', month:'short'}) + ' ' + d.toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
 }
-
 function statusColor(left){
   if(left <= 1) return 'var(--red)';
   if(left <= 3) return 'var(--amber)';
   return 'var(--green)';
 }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function setConn(status){
+  const dot = document.getElementById('connDot');
+  const label = document.getElementById('connLabel');
+  dot.className = 'conn-dot' + (status==='ok' ? ' ok' : status==='bad' ? ' bad' : '');
+  label.textContent = status==='ok' ? 'bağlı' : status==='bad' ? 'bağlantı hatası' : 'bağlanıyor…';
+}
 
+// ---------- Render ----------
 function render(){
   const grid = document.getElementById('grid');
   const empty = document.getElementById('emptyState');
@@ -327,8 +427,10 @@ function render(){
 
   if(apps.length === 0){
     empty.style.display = 'block';
+    grid.style.display = 'grid';
   } else {
     empty.style.display = 'none';
+    grid.style.display = 'grid';
   }
 
   apps.forEach(app => {
@@ -345,15 +447,15 @@ function render(){
       <div class="card-head">
         <div>
           <div class="card-title">${escapeHtml(app.name)}</div>
-          <div class="card-id">${escapeHtml(app.projectId)}</div>
+          <div class="card-id">${escapeHtml(app.project_id)}</div>
         </div>
         <div class="card-menu">
           <button class="icon-btn" onclick="toggleMenu(event,'${app.id}')">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg>
           </button>
           <div class="menu-pop" id="menu-${app.id}">
-            <button onclick="editApp('${app.id}')">Düzenle</button>
-            <button class="danger" onclick="deleteApp('${app.id}')">Sil</button>
+            <button onclick="editApp(${app.id})">Düzenle</button>
+            <button class="danger" onclick="deleteApp(${app.id})">Sil</button>
           </div>
         </div>
       </div>
@@ -365,11 +467,11 @@ function render(){
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${color};"></div></div>
       <div class="meta-row">
         <span>Son güncelleme</span>
-        <span>${fmtDate(app.lastUpdated)}</span>
+        <span>${fmtDate(app.last_updated)}</span>
       </div>
 
       <div class="card-actions">
-        <button class="btn primary" id="btn-${app.id}" onclick="updateApp('${app.id}')">
+        <button class="btn primary" id="btn-${app.id}" onclick="updateApp(${app.id})">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6"/></svg>
           Güncelle
         </button>
@@ -378,7 +480,6 @@ function render(){
     grid.appendChild(card);
   });
 
-  // add card
   const addCard = document.createElement('div');
   addCard.className = 'add-card';
   addCard.onclick = () => openModal();
@@ -406,10 +507,6 @@ function renderStats(){
   `;
 }
 
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
 function toggleMenu(e, id){
   e.stopPropagation();
   const el = document.getElementById('menu-'+id);
@@ -421,18 +518,17 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.menu-pop').forEach(m => m.classList.remove('open'));
 });
 
+// ---------- Add/Edit modal ----------
 function openModal(app = null){
   editingId = app ? app.id : null;
   document.getElementById('modalTitle').textContent = app ? 'Uygulamayı düzenle' : 'Yeni proje ekle';
   document.getElementById('fName').value = app ? app.name : '';
-  document.getElementById('fProjectId').value = app ? app.projectId : '';
-  document.getElementById('fApiKey').value = app ? app.apiKey : '';
-  document.getElementById('fTable').value = app ? app.table : 'keepalive';
+  document.getElementById('fProjectId').value = app ? app.project_id : '';
+  document.getElementById('fApiKey').value = app ? app.api_key : '';
+  document.getElementById('fTable').value = app ? app.table_name : 'keepalive';
   document.getElementById('addOverlay').classList.add('open');
 }
-function closeModal(){
-  document.getElementById('addOverlay').classList.remove('open');
-}
+function closeModal(){ document.getElementById('addOverlay').classList.remove('open'); }
 document.getElementById('addOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'addOverlay') closeModal();
 });
@@ -442,14 +538,19 @@ function editApp(id){
   if(app) openModal(app);
 }
 
-function deleteApp(id){
+async function deleteApp(id){
   if(!confirm('Bu uygulamayı silmek istediğine emin misin?')) return;
-  apps = apps.filter(a => a.id !== id);
-  persist();
-  render();
+  try{
+    await deleteAppRow(id);
+    apps = apps.filter(a => a.id !== id);
+    render();
+    showToast('Silindi');
+  }catch(err){
+    showToast('Silme başarısız: ' + err.message, true);
+  }
 }
 
-function saveApp(){
+async function saveApp(){
   const name = document.getElementById('fName').value.trim();
   const projectId = document.getElementById('fProjectId').value.trim().replace('https://','').replace('.supabase.co','').replace(/\/$/,'');
   const apiKey = document.getElementById('fApiKey').value.trim();
@@ -460,23 +561,43 @@ function saveApp(){
     return;
   }
 
-  if(editingId){
-    const app = apps.find(a => a.id === editingId);
-    app.name = name; app.projectId = projectId; app.apiKey = apiKey; app.table = table;
-  } else {
-    apps.push({
-      id: 'app_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-      name, projectId, apiKey, table,
-      lastUpdated: new Date().toISOString()
-    });
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Kaydediliyor…';
+
+  try{
+    if(editingId){
+      const updated = await updateAppRow(editingId, {
+        name, project_id: projectId, api_key: apiKey, table_name: table
+      });
+      const idx = apps.findIndex(a => a.id === editingId);
+      apps[idx] = updated;
+    } else {
+      const row = await insertAppRow({
+        name, project_id: projectId, api_key: apiKey, table_name: table,
+        last_updated: new Date().toISOString()
+      });
+      apps.push(row);
+    }
+    closeModal();
+    render();
+    showToast('Kaydedildi');
+  }catch(err){
+    showToast('Kaydetme başarısız: ' + err.message, true);
+  }finally{
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Kaydet';
   }
-  persist();
-  closeModal();
-  render();
 }
 
-function copySql(){
-  const text = document.getElementById('sqlBox').innerText.replace('Kopyala','').trim();
+// ---------- SQL modal ----------
+function openSqlModal(){ document.getElementById('sqlOverlay').classList.add('open'); }
+function closeSqlModal(){ document.getElementById('sqlOverlay').classList.remove('open'); }
+document.getElementById('sqlOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'sqlOverlay') closeSqlModal();
+});
+function copySql(boxId){
+  const text = document.getElementById(boxId).innerText.replace('Kopyala','').trim();
   navigator.clipboard.writeText(text).then(() => showToast('SQL kopyalandı'));
 }
 
@@ -489,17 +610,17 @@ function showToast(msg, isError = false){
   setTimeout(() => t.remove(), 3200);
 }
 
+// ---------- Ping a tracked app's own Supabase project ----------
 async function pingSupabase(app){
-  const base = `https://${app.projectId}.supabase.co/rest/v1/${app.table}`;
+  const base = `https://${app.project_id}.supabase.co/rest/v1/${app.table_name}`;
   const headers = {
-    'apikey': app.apiKey,
-    'Authorization': `Bearer ${app.apiKey}`,
+    'apikey': app.api_key,
+    'Authorization': `Bearer ${app.api_key}`,
     'Content-Type': 'application/json',
   };
-
   const insertRes = await fetch(base, {
-    method: 'POST',
-    headers: {...headers, 'Prefer': 'return=representation'},
+    method:'POST',
+    headers: {...headers, 'Prefer':'return=representation'},
     body: JSON.stringify({})
   });
   if(!insertRes.ok){
@@ -508,7 +629,6 @@ async function pingSupabase(app){
   }
   const rows = await insertRes.json();
   const row = Array.isArray(rows) ? rows[0] : rows;
-
   if(row && row.id !== undefined){
     await fetch(`${base}?id=eq.${row.id}`, { method:'DELETE', headers });
   }
@@ -525,8 +645,10 @@ async function updateApp(id){
 
   try{
     await pingSupabase(app);
-    app.lastUpdated = new Date().toISOString();
-    persist();
+    const nowIso = new Date().toISOString();
+    const updated = await updateAppRow(id, { last_updated: nowIso });
+    const idx = apps.findIndex(a => a.id === id);
+    apps[idx] = updated;
     render();
     showToast(`${app.name} güncellendi ✓`);
   }catch(err){
@@ -547,12 +669,13 @@ async function bulkUpdate(){
     label.textContent = `${app.name} güncelleniyor…`;
     try{
       await pingSupabase(app);
-      app.lastUpdated = new Date().toISOString();
+      const updated = await updateAppRow(app.id, { last_updated: new Date().toISOString() });
+      const idx = apps.findIndex(a => a.id === app.id);
+      apps[idx] = updated;
       ok++;
     }catch(e){
       fail++;
     }
-    persist();
     render();
   }
 
@@ -561,11 +684,30 @@ async function bulkUpdate(){
   showToast(`Bitti: ${ok} başarılı${fail ? ', ' + fail + ' başarısız' : ''}`, fail > 0);
 }
 
-// live countdown refresh every 60s
-setInterval(render, 60000);
+// ---------- Boot ----------
+async function boot(){
+  setConn('connecting');
+  try{
+    apps = await fetchApps();
+    setConn('ok');
+    document.getElementById('loadingState').style.display = 'none';
+    render();
+  }catch(err){
+    setConn('bad');
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('grid').style.display = 'grid';
+    document.getElementById('grid').innerHTML = '';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyState').innerHTML = `
+      <h2>Supabase'e bağlanılamadı</h2>
+      <p>${escapeHtml(err.message)}<br>Sağ üstteki <b>SQL</b> butonundan "1) Bu panelin kendi projesinde" script'ini çalıştırdığından emin ol, sonra sayfayı yenile.</p>
+    `;
+    renderStats();
+  }
+}
 
-loadApps();
-render();
+setInterval(() => { if(apps.length) render(); }, 60000);
+boot();
 </script>
 </body>
 </html>
