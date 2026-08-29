@@ -1,376 +1,713 @@
 <!DOCTYPE html>
-<html lang="az">
+<html lang="tr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Yazışma Proqramı</title>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<title>Keepalive — Supabase Uyandırıcı</title>
 <style>
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    background: #ffffff;
-    color: #222;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100vh;
-    padding: 20px;
+  :root{
+    --bg:#0a0b0a;
+    --panel:#111312;
+    --panel-2:#161816;
+    --border:#232623;
+    --border-soft:#1b1d1b;
+    --text:#e7e9e6;
+    --text-dim:#8a8f89;
+    --text-faint:#5b615b;
+    --green:#3ecf8e;
+    --green-dim:#2a9d6c;
+    --amber:#e2b93b;
+    --red:#e5484d;
+    --mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
   }
-  .container {
-    width: 100%;
-    max-width: 480px;
-    background: #ffffff;
-    border: 1px solid #e5e5e5;
-    border-radius: 14px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-    overflow: hidden;
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(62,207,142,0.07), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(62,207,142,0.04), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    min-height:100vh;
+    padding:32px 28px 120px;
   }
-  header {
-    background: #ffffff;
-    border-bottom: 1px solid #eee;
-    padding: 16px 20px;
-    text-align: center;
+  ::selection{background:rgba(62,207,142,0.3);}
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    max-width:1180px; margin:0 auto 28px; flex-wrap:wrap; gap:14px;
   }
-  header h1 {
-    margin: 0;
-    font-size: 18px;
-    color: #111;
+  .brand{display:flex; align-items:center; gap:11px;}
+  .brand .dot{
+    width:34px;height:34px;border-radius:9px;
+    background:linear-gradient(155deg, var(--green), var(--green-dim));
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 1px rgba(62,207,142,0.25), 0 8px 20px -8px rgba(62,207,142,0.5);
+    flex-shrink:0;
   }
-  #status {
-    font-size: 12px;
-    color: #888;
-    margin-top: 4px;
+  .brand .dot svg{width:18px;height:18px;}
+  .brand h1{font-size:16.5px;font-weight:600;margin:0;letter-spacing:-0.01em;}
+  .brand p{margin:1px 0 0;font-size:12px;color:var(--text-dim); display:flex; align-items:center; gap:6px;}
+  .conn-dot{width:6px;height:6px;border-radius:50%; background:var(--text-faint); flex-shrink:0;}
+  .conn-dot.ok{background:var(--green);}
+  .conn-dot.bad{background:var(--red);}
+
+  .top-right{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .stats{display:flex; gap:10px; flex-wrap:wrap;}
+  .stat-chip{
+    background:var(--panel); border:1px solid var(--border-soft); border-radius:9px;
+    padding:8px 13px; font-size:12px; color:var(--text-dim); display:flex; gap:7px; align-items:center;
   }
-  .setup {
-    padding: 20px;
-    border-bottom: 1px solid #f0f0f0;
+  .stat-chip b{color:var(--text); font-weight:600;}
+  .stat-chip .sw{width:7px;height:7px;border-radius:50%; flex-shrink:0;}
+
+  .sql-trigger{
+    display:flex; align-items:center; gap:7px; background:var(--panel); border:1px solid var(--border-soft);
+    border-radius:9px; padding:8px 13px; font-size:12px; color:var(--text-dim); cursor:pointer;
+    font-family:inherit; transition:border-color .15s, color .15s;
   }
-  .setup label {
-    font-size: 13px;
-    color: #555;
-    display: block;
-    margin-bottom: 4px;
+  .sql-trigger:hover{border-color:#3a3e3a; color:var(--text);}
+  .sql-trigger svg{width:14px;height:14px;}
+
+  .grid{
+    max-width:1180px; margin:0 auto;
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(272px,1fr)); gap:16px;
   }
-  .id-box {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: #fafafa;
-    border: 1px solid #e5e5e5;
-    border-radius: 8px;
-    padding: 8px 10px;
-    margin-bottom: 12px;
+
+  .card{
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    border:1px solid var(--border); border-radius:14px; padding:18px;
+    position:relative; overflow:hidden; transition:border-color .15s, transform .15s;
+    display:flex; flex-direction:column; min-height:198px;
   }
-  .id-box span {
-    font-weight: 600;
-    color: #111;
-    font-size: 14px;
-    flex: 1;
-    word-break: break-all;
+  .card:hover{border-color:#2c302c;}
+  .card .glow{
+    position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .3s;
+    background:radial-gradient(240px 120px at 100% 0%, rgba(62,207,142,0.09), transparent 70%);
   }
-  .id-box button {
-    background: #f0f0f0;
-    border: none;
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 12px;
-    cursor: pointer;
-    color: #333;
+  .card:hover .glow{opacity:1;}
+
+  .card-head{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .card-title{font-size:14.5px; font-weight:600; letter-spacing:-0.01em; line-height:1.3; word-break:break-word;}
+  .card-id{font-family:var(--mono); font-size:11px; color:var(--text-faint); margin-top:4px; word-break:break-all;}
+
+  .card-menu{position:relative;}
+  .icon-btn{
+    background:transparent; border:none; color:var(--text-faint); cursor:pointer;
+    width:26px; height:26px; border-radius:7px; display:flex; align-items:center; justify-content:center;
+    transition:background .15s, color .15s; flex-shrink:0;
   }
-  .connect-row {
-    display: flex;
-    gap: 8px;
+  .icon-btn:hover{background:var(--border-soft); color:var(--text);}
+  .menu-pop{
+    position:absolute; right:0; top:30px; background:var(--panel-2); border:1px solid var(--border);
+    border-radius:9px; padding:5px; min-width:120px; z-index:20; box-shadow:0 12px 30px -10px rgba(0,0,0,0.6);
+    display:none;
   }
-  .icon-btn {
-    background: #f0f0f0;
-    border: none;
-    border-radius: 8px;
-    width: 42px;
-    font-size: 18px;
-    cursor: pointer;
-    flex-shrink: 0;
+  .menu-pop.open{display:block;}
+  .menu-pop button{
+    display:flex; align-items:center; gap:7px; width:100%; background:none; border:none; color:var(--text-dim);
+    font-size:12.5px; padding:7px 8px; border-radius:6px; cursor:pointer; text-align:left; font-family:inherit;
   }
-  .icon-btn:hover { background: #e2e2e2; }
-  #qrModal, #scanModal {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.5);
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 20px;
+  .menu-pop button:hover{background:var(--border-soft); color:var(--text);}
+  .menu-pop button.danger:hover{color:var(--red);}
+
+  .status-row{margin-top:16px; display:flex; align-items:baseline; gap:8px;}
+  .days-num{font-size:34px; font-weight:700; letter-spacing:-0.02em; line-height:1;}
+  .days-label{font-size:12px; color:var(--text-dim);}
+
+  .bar-track{height:5px; border-radius:99px; background:var(--border-soft); margin-top:12px; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:99px; transition:width .4s ease;}
+
+  .meta-row{display:flex; justify-content:space-between; margin-top:10px; font-size:11px; color:var(--text-faint);}
+
+  .card-actions{display:flex; gap:8px; margin-top:auto; padding-top:16px;}
+  .btn{
+    font-family:inherit; font-size:12.5px; font-weight:600; border-radius:8px; padding:8px 12px;
+    cursor:pointer; border:1px solid var(--border); background:var(--panel-2); color:var(--text);
+    display:flex; align-items:center; justify-content:center; gap:6px; transition:all .15s;
   }
-  .modal-box {
-    background: #fff;
-    border-radius: 14px;
-    padding: 20px;
-    max-width: 340px;
-    width: 100%;
-    text-align: center;
+  .btn:hover{border-color:#3a3e3a; background:#1a1c1a;}
+  .btn.primary{
+    flex:1; background:linear-gradient(180deg, rgba(62,207,142,0.16), rgba(62,207,142,0.07));
+    border-color:rgba(62,207,142,0.35); color:var(--green);
   }
-  .modal-box h3 {
-    margin-top: 0;
-    font-size: 15px;
-    color: #333;
+  .btn.primary:hover{background:linear-gradient(180deg, rgba(62,207,142,0.24), rgba(62,207,142,0.11)); border-color:rgba(62,207,142,0.55);}
+  .btn.primary:disabled{opacity:0.5; cursor:default;}
+  .btn svg{width:13px;height:13px;}
+  .spin{animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .add-card{
+    border:1.5px dashed var(--border); border-radius:14px; min-height:198px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    background:transparent; transition:border-color .15s, background .15s;
+    flex-direction:column; gap:8px;
   }
-  #qrCanvasWrap { display: flex; justify-content: center; margin: 12px 0; }
-  #reader { width: 100%; margin: 12px 0; border-radius: 8px; overflow: hidden; }
-  .modal-close {
-    margin-top: 8px;
-    background: #111;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-size: 13px;
-    cursor: pointer;
+  .add-card:hover{border-color:var(--green-dim); background:rgba(62,207,142,0.04);}
+  .add-card .plus{
+    width:38px;height:38px;border-radius:10px;border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;color:var(--text-dim);
   }
-  input[type=text] {
-    flex: 1;
-    padding: 10px 12px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    font-size: 14px;
-    outline: none;
-    background: #fff;
+  .add-card:hover .plus{border-color:var(--green-dim); color:var(--green);}
+  .add-card span{font-size:12.5px; color:var(--text-dim); font-weight:500;}
+
+  .empty{
+    max-width:1180px; margin:60px auto; text-align:center; color:var(--text-dim);
   }
-  input[type=text]:focus {
-    border-color: #bbb;
+  .empty h2{color:var(--text); font-size:17px; margin-bottom:6px;}
+  .empty p{font-size:13px; max-width:400px; margin:0 auto;}
+
+  .loading-row{max-width:1180px; margin:60px auto; text-align:center; color:var(--text-dim); font-size:13px;}
+
+  /* Bulk update FAB */
+  .fab{
+    position:fixed; right:26px; bottom:26px; z-index:30;
+    background:linear-gradient(155deg, var(--green), var(--green-dim));
+    color:#06120c; border:none; border-radius:13px; padding:14px 20px;
+    font-family:inherit; font-weight:700; font-size:13.5px; cursor:pointer;
+    display:flex; align-items:center; gap:9px;
+    box-shadow:0 12px 30px -8px rgba(62,207,142,0.55), 0 0 0 1px rgba(62,207,142,0.4);
+    transition:transform .15s, box-shadow .15s;
   }
-  button.primary {
-    background: #111;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 16px;
-    font-size: 14px;
-    cursor: pointer;
+  .fab:hover{transform:translateY(-2px); box-shadow:0 16px 34px -8px rgba(62,207,142,0.65), 0 0 0 1px rgba(62,207,142,0.5);}
+  .fab:disabled{opacity:0.55; cursor:default; transform:none;}
+  .fab svg{width:16px;height:16px;}
+
+  /* Modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(4,5,4,0.72); backdrop-filter:blur(3px);
+    display:none; align-items:center; justify-content:center; z-index:100; padding:20px;
   }
-  button.primary:hover { background: #333; }
-  #chat-area {
-    display: none;
-    flex-direction: column;
-    height: 420px;
+  .overlay.open{display:flex;}
+  .modal{
+    background:var(--panel-2); border:1px solid var(--border); border-radius:16px;
+    width:100%; max-width:440px; padding:24px; max-height:88vh; overflow-y:auto;
+    box-shadow:0 30px 70px -20px rgba(0,0,0,0.7);
   }
-  #messages {
-    flex: 1;
-    padding: 16px;
-    overflow-y: auto;
-    background: #ffffff;
+  .modal.wide{max-width:560px;}
+  .modal h3{margin:0 0 4px; font-size:16px; font-weight:650;}
+  .modal .sub{font-size:12.5px; color:var(--text-dim); margin:0 0 20px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; color:var(--text-dim); margin-bottom:6px; font-weight:500;}
+  .field input{
+    width:100%; background:var(--bg); border:1px solid var(--border); border-radius:9px;
+    padding:10px 12px; color:var(--text); font-size:13px; font-family:var(--mono);
+    outline:none; transition:border-color .15s;
   }
-  .msg {
-    max-width: 75%;
-    padding: 8px 12px;
-    border-radius: 14px;
-    margin-bottom: 8px;
-    font-size: 14px;
-    line-height: 1.4;
-    word-wrap: break-word;
+  .field input:not([type=number])::placeholder{font-family:-apple-system, sans-serif;}
+  .field input:focus{border-color:var(--green-dim); background:#0d0f0d;}
+  .field .hint{font-size:11px; color:var(--text-faint); margin-top:5px;}
+  .modal-actions{display:flex; gap:10px; margin-top:20px;}
+  .modal-actions .btn{flex:1; padding:11px;}
+
+  .sql-block-label{font-size:12px; font-weight:600; color:var(--text-dim); margin:18px 0 6px;}
+  .sql-block-label:first-of-type{margin-top:0;}
+  .sql-box{
+    background:var(--bg); border:1px solid var(--border-soft); border-radius:10px;
+    padding:13px 14px; font-family:var(--mono); font-size:11.3px; line-height:1.6;
+    color:#a6f0cc; white-space:pre-wrap; word-break:break-word; position:relative;
   }
-  .me {
-    background: #111;
-    color: #fff;
-    margin-left: auto;
-    border-bottom-right-radius: 4px;
+  .copy-btn{
+    position:absolute; top:8px; right:8px; background:var(--panel); border:1px solid var(--border);
+    color:var(--text-dim); font-size:10.5px; padding:5px 9px; border-radius:6px; cursor:pointer; font-family:inherit;
   }
-  .them {
-    background: #f2f2f2;
-    color: #111;
-    margin-right: auto;
-    border-bottom-left-radius: 4px;
+  .copy-btn:hover{color:var(--text); border-color:#3a3e3a;}
+
+  .toast-wrap{position:fixed; top:20px; right:20px; z-index:200; display:flex; flex-direction:column; gap:8px;}
+  .toast{
+    background:var(--panel-2); border:1px solid var(--border); border-radius:10px; padding:11px 15px;
+    font-size:12.5px; color:var(--text); box-shadow:0 12px 30px -10px rgba(0,0,0,0.6);
+    display:flex; align-items:center; gap:8px; min-width:220px; animation:slideIn .2s ease;
+    border-left:3px solid var(--green);
   }
-  .sys {
-    text-align: center;
-    color: #999;
-    font-size: 12px;
-    margin: 10px 0;
-  }
-  .input-row {
-    display: flex;
-    gap: 8px;
-    padding: 12px;
-    border-top: 1px solid #eee;
-    background: #fff;
-  }
+  .toast.error{border-left-color:var(--red);}
+  @keyframes slideIn{from{transform:translateX(20px); opacity:0;} to{transform:translateX(0); opacity:1;}}
+
+  .footer-note{max-width:1180px; margin:36px auto 0; text-align:center; font-size:11.5px; color:var(--text-faint);}
 </style>
 </head>
 <body>
 
-<div class="container">
-  <header>
-    <h1>💬 Yazışma Proqramı</h1>
-    <div id="status">Bağlantı gözlənilir...</div>
-  </header>
-
-  <div class="setup" id="setup">
-    <label>Sənin ID-n (bunu qarşı tərəfə göndər):</label>
-    <div class="id-box">
-      <span id="myId">yüklənir...</span>
-      <button onclick="copyId()">Kopyala</button>
+  <div class="topbar">
+    <div class="brand">
+      <div class="dot">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 14h7l-1 8 9-13h-7l1-7z" fill="#06120c"/></svg>
+      </div>
+      <div>
+        <h1>Keepalive</h1>
+        <p><span class="conn-dot" id="connDot"></span><span id="connLabel">bağlanıyor…</span></p>
+      </div>
     </div>
-    <label>Qoşulmaq istədiyin ID:</label>
-    <div class="connect-row">
-      <input type="text" id="peerIdInput" placeholder="Qarşı tərəfin ID-sini yaz">
-      <button class="icon-btn" onclick="openScanner()" title="Kamera ilə QR oxu">📷</button>
-      <button class="icon-btn" onclick="openMyQr()" title="Öz QR kodunu göstər">▦</button>
-      <button class="primary" onclick="connectToPeer()">Qoşul</button>
+    <div class="top-right">
+      <div class="stats" id="statsRow"></div>
+      <button class="sql-trigger" onclick="openSqlModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><path d="M8 9l-3 3 3 3M16 9l3 3-3 3M13 6l-2 12"/></svg>
+        SQL
+      </button>
     </div>
   </div>
 
-  <!-- Öz ID-nin QR kodu -->
-  <div id="qrModal">
-    <div class="modal-box">
-      <h3>Bu QR kodu qarşı tərəfə göstər</h3>
-      <div id="qrCanvasWrap"></div>
-      <button class="modal-close" onclick="closeQrModal()">Bağla</button>
+  <div class="grid" id="grid" style="display:none;"></div>
+  <div class="loading-row" id="loadingState">Supabase'e bağlanılıyor…</div>
+  <div class="empty" id="emptyState" style="display:none;">
+    <h2>Henüz proje yok</h2>
+    <p>Sağ üstteki + kartına tıkla, izlemek istediğin Supabase proje ID'n ve API anahtarını gir. Bu uygulamanın verileri de kendi Supabase projende saklanır — sağ üstteki SQL butonundan tabloyu oluşturman gerekiyor.</p>
+  </div>
+
+  <div class="footer-note">Bu panelin verileri (proje listeni) kendi Supabase projende <b>tracked_apps</b> tablosunda saklanır — tarayıcıda hiçbir şey tutulmaz.</div>
+
+  <button class="fab" id="bulkBtn" onclick="bulkUpdate()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6"/></svg>
+    <span id="bulkBtnLabel">Tümünü Güncelle</span>
+  </button>
+
+  <!-- Add/Edit modal -->
+  <div class="overlay" id="addOverlay">
+    <div class="modal">
+      <h3 id="modalTitle">Yeni proje ekle</h3>
+      <p class="sub">İzlenecek Supabase projenin bilgilerini gir.</p>
+
+      <div class="field">
+        <label>Uygulama adı</label>
+        <input type="text" id="fName" placeholder="Örn: Portfolyo Backend">
+      </div>
+      <div class="field">
+        <label>Supabase Project ID</label>
+        <input type="text" id="fProjectId" placeholder="abcdefghijklmnopqrst">
+        <div class="hint">Proje ayarları → General → Reference ID. (xyz.supabase.co içindeki "xyz" kısmı)</div>
+      </div>
+      <div class="field">
+        <label>API Key (anon / publishable / service_role)</label>
+        <input type="text" id="fApiKey" placeholder="eyJhbGciOi... veya sb_publishable_...">
+      </div>
+      <div class="field">
+        <label>Tablo adı</label>
+        <input type="text" id="fTable" placeholder="keepalive" value="keepalive">
+        <div class="hint">O projede bu tablo yoksa SQL butonundaki "izlenen proje" script'ini orada çalıştır.</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">Vazgeç</button>
+        <button class="btn primary" id="saveBtn" onclick="saveApp()">Kaydet</button>
+      </div>
     </div>
   </div>
 
-  <!-- Kamera ilə QR skan -->
-  <div id="scanModal">
-    <div class="modal-box">
-      <h3>Qarşı tərəfin QR kodunu kameraya tut</h3>
-      <div id="reader"></div>
-      <button class="modal-close" onclick="closeScanner()">Bağla</button>
+  <!-- SQL modal -->
+  <div class="overlay" id="sqlOverlay">
+    <div class="modal wide">
+      <h3>SQL script'leri</h3>
+      <p class="sub">İki ayrı script var: biri bu panelin kendi verisini tutan proje için, diğeri izlediğin her proje için.</p>
+
+      <div class="sql-block-label">1) Bu panelin kendi Supabase projesinde bir kere çalıştır (uqdiiuqpkvqxunxthpbj)</div>
+      <div class="sql-box" id="sqlBoxConfig">create table if not exists public.tracked_apps (
+  id bigint generated by default as identity primary key,
+  name text not null,
+  project_id text not null,
+  api_key text not null,
+  table_name text not null default 'keepalive',
+  last_updated timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+alter table public.tracked_apps enable row level security;
+
+create policy "tracked_apps allow all"
+on public.tracked_apps for all
+using (true) with check (true);
+        <button class="copy-btn" onclick="copySql('sqlBoxConfig')">Kopyala</button>
+      </div>
+
+      <div class="sql-block-label">2) İzlediğin her projede bir kere çalıştır (uyandırma tablosu)</div>
+      <div class="sql-box" id="sqlBoxTracked">create table if not exists public.keepalive (
+  id bigint generated by default as identity primary key,
+  created_at timestamptz not null default now()
+);
+
+alter table public.keepalive enable row level security;
+
+create policy "keepalive allow all"
+on public.keepalive for all
+using (true) with check (true);
+        <button class="copy-btn" onclick="copySql('sqlBoxTracked')">Kopyala</button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" style="flex:1" onclick="closeSqlModal()">Kapat</button>
+      </div>
     </div>
   </div>
 
-  <div id="chat-area">
-    <div id="messages"></div>
-    <div class="input-row">
-      <input type="text" id="msgInput" placeholder="Mesaj yaz..." onkeypress="if(event.key==='Enter')sendMsg()">
-      <button class="primary" onclick="sendMsg()">Göndər</button>
-    </div>
-  </div>
-</div>
+  <div class="toast-wrap" id="toastWrap"></div>
 
 <script>
-  const peer = new Peer();
-  let conn = null;
+// ---- Bu panelin KENDİ verisini sakladığı Supabase projesi ----
+const CONFIG_URL = 'https://uqdiiuqpkvqxunxthpbj.supabase.co';
+const CONFIG_KEY = 'sb_publishable_OVeHJcQu0baBolEmE7JTmw_TZd74LNs';
+const CONFIG_TABLE = 'tracked_apps';
+const CONFIG_REST = `${CONFIG_URL}/rest/v1/${CONFIG_TABLE}`;
+const configHeaders = {
+  'apikey': CONFIG_KEY,
+  'Authorization': `Bearer ${CONFIG_KEY}`,
+  'Content-Type': 'application/json',
+};
 
-  const statusEl = document.getElementById('status');
-  const myIdEl = document.getElementById('myId');
-  const messagesEl = document.getElementById('messages');
-  const chatArea = document.getElementById('chat-area');
-  const setupEl = document.getElementById('setup');
+let apps = [];
+let editingId = null;
 
-  peer.on('open', id => {
-    myIdEl.textContent = id;
-    statusEl.textContent = 'Hazırsan. ID-ni paylaş və ya qoşul.';
+// ---------- Config-store CRUD (kendi verimiz) ----------
+async function fetchApps(){
+  const res = await fetch(`${CONFIG_REST}?select=*&order=created_at.asc`, { headers: configHeaders });
+  if(!res.ok){
+    const txt = await res.text();
+    throw new Error(`(${res.status}) ${txt.slice(0,140)}`);
+  }
+  return res.json();
+}
+
+async function insertAppRow(payload){
+  const res = await fetch(CONFIG_REST, {
+    method:'POST',
+    headers: {...configHeaders, 'Prefer':'return=representation'},
+    body: JSON.stringify(payload)
+  });
+  if(!res.ok) throw new Error(await res.text());
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
+async function updateAppRow(id, patch){
+  const res = await fetch(`${CONFIG_REST}?id=eq.${id}`, {
+    method:'PATCH',
+    headers: {...configHeaders, 'Prefer':'return=representation'},
+    body: JSON.stringify(patch)
+  });
+  if(!res.ok) throw new Error(await res.text());
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
+async function deleteAppRow(id){
+  const res = await fetch(`${CONFIG_REST}?id=eq.${id}`, { method:'DELETE', headers: configHeaders });
+  if(!res.ok) throw new Error(await res.text());
+}
+
+// ---------- Helpers ----------
+function daysLeft(app){
+  const last = new Date(app.last_updated);
+  const now = new Date();
+  const elapsedDays = (now - last) / (1000*60*60*24);
+  return 7 - elapsedDays;
+}
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('tr-TR', {day:'2-digit', month:'short'}) + ' ' + d.toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+}
+function statusColor(left){
+  if(left <= 1) return 'var(--red)';
+  if(left <= 3) return 'var(--amber)';
+  return 'var(--green)';
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function setConn(status){
+  const dot = document.getElementById('connDot');
+  const label = document.getElementById('connLabel');
+  dot.className = 'conn-dot' + (status==='ok' ? ' ok' : status==='bad' ? ' bad' : '');
+  label.textContent = status==='ok' ? 'bağlı' : status==='bad' ? 'bağlantı hatası' : 'bağlanıyor…';
+}
+
+// ---------- Render ----------
+function render(){
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('emptyState');
+  grid.innerHTML = '';
+
+  if(apps.length === 0){
+    empty.style.display = 'block';
+    grid.style.display = 'grid';
+  } else {
+    empty.style.display = 'none';
+    grid.style.display = 'grid';
+  }
+
+  apps.forEach(app => {
+    const left = daysLeft(app);
+    const leftClamped = Math.max(0, left);
+    const pct = Math.max(2, Math.min(100, (leftClamped/7)*100));
+    const color = statusColor(left);
+    const displayDays = left <= 0 ? 'Şimdi!' : Math.ceil(left);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="glow"></div>
+      <div class="card-head">
+        <div>
+          <div class="card-title">${escapeHtml(app.name)}</div>
+          <div class="card-id">${escapeHtml(app.project_id)}</div>
+        </div>
+        <div class="card-menu">
+          <button class="icon-btn" onclick="toggleMenu(event,'${app.id}')">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg>
+          </button>
+          <div class="menu-pop" id="menu-${app.id}">
+            <button onclick="editApp(${app.id})">Düzenle</button>
+            <button class="danger" onclick="deleteApp(${app.id})">Sil</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-row">
+        <div class="days-num" style="color:${color}">${displayDays}</div>
+        <div class="days-label">${left <= 0 ? 'süre doldu, güncelle' : 'gün kaldı'}</div>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${color};"></div></div>
+      <div class="meta-row">
+        <span>Son güncelleme</span>
+        <span>${fmtDate(app.last_updated)}</span>
+      </div>
+
+      <div class="card-actions">
+        <button class="btn primary" id="btn-${app.id}" onclick="updateApp(${app.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6"/></svg>
+          Güncelle
+        </button>
+      </div>
+    `;
+    grid.appendChild(card);
   });
 
-  peer.on('connection', c => {
-    conn = c;
-    setupConnection();
-  });
+  const addCard = document.createElement('div');
+  addCard.className = 'add-card';
+  addCard.onclick = () => openModal();
+  addCard.innerHTML = `
+    <div class="plus">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </div>
+    <span>Uygulama ekle</span>
+  `;
+  grid.appendChild(addCard);
 
-  peer.on('error', err => {
-    statusEl.textContent = 'Xəta: ' + err.type;
-  });
+  renderStats();
+}
 
-  function copyId() {
-    navigator.clipboard.writeText(myIdEl.textContent);
-    statusEl.textContent = 'ID kopyalandı!';
+function renderStats(){
+  const wrap = document.getElementById('statsRow');
+  if(apps.length === 0){ wrap.innerHTML = ''; return; }
+  const urgent = apps.filter(a => daysLeft(a) <= 1).length;
+  const soon = apps.filter(a => { const l = daysLeft(a); return l > 1 && l <= 3; }).length;
+  const safe = apps.length - urgent - soon;
+  wrap.innerHTML = `
+    <div class="stat-chip"><span class="sw" style="background:var(--green)"></span>Güvenli <b>${safe}</b></div>
+    <div class="stat-chip"><span class="sw" style="background:var(--amber)"></span>Yaklaşıyor <b>${soon}</b></div>
+    <div class="stat-chip"><span class="sw" style="background:var(--red)"></span>Acil <b>${urgent}</b></div>
+  `;
+}
+
+function toggleMenu(e, id){
+  e.stopPropagation();
+  const el = document.getElementById('menu-'+id);
+  const isOpen = el.classList.contains('open');
+  document.querySelectorAll('.menu-pop').forEach(m => m.classList.remove('open'));
+  if(!isOpen) el.classList.add('open');
+}
+document.addEventListener('click', () => {
+  document.querySelectorAll('.menu-pop').forEach(m => m.classList.remove('open'));
+});
+
+// ---------- Add/Edit modal ----------
+function openModal(app = null){
+  editingId = app ? app.id : null;
+  document.getElementById('modalTitle').textContent = app ? 'Uygulamayı düzenle' : 'Yeni proje ekle';
+  document.getElementById('fName').value = app ? app.name : '';
+  document.getElementById('fProjectId').value = app ? app.project_id : '';
+  document.getElementById('fApiKey').value = app ? app.api_key : '';
+  document.getElementById('fTable').value = app ? app.table_name : 'keepalive';
+  document.getElementById('addOverlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('addOverlay').classList.remove('open'); }
+document.getElementById('addOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'addOverlay') closeModal();
+});
+
+function editApp(id){
+  const app = apps.find(a => a.id === id);
+  if(app) openModal(app);
+}
+
+async function deleteApp(id){
+  if(!confirm('Bu uygulamayı silmek istediğine emin misin?')) return;
+  try{
+    await deleteAppRow(id);
+    apps = apps.filter(a => a.id !== id);
+    render();
+    showToast('Silindi');
+  }catch(err){
+    showToast('Silme başarısız: ' + err.message, true);
+  }
+}
+
+async function saveApp(){
+  const name = document.getElementById('fName').value.trim();
+  const projectId = document.getElementById('fProjectId').value.trim().replace('https://','').replace('.supabase.co','').replace(/\/$/,'');
+  const apiKey = document.getElementById('fApiKey').value.trim();
+  const table = document.getElementById('fTable').value.trim() || 'keepalive';
+
+  if(!name || !projectId || !apiKey){
+    showToast('Lütfen tüm alanları doldur', true);
+    return;
   }
 
-  // ---- Öz ID-nin QR kodunu göstərmək ----
-  function openMyQr() {
-    const wrap = document.getElementById('qrCanvasWrap');
-    wrap.innerHTML = '';
-    const canvas = document.createElement('canvas');
-    wrap.appendChild(canvas);
-    QRCode.toCanvas(canvas, myIdEl.textContent, { width: 220, margin: 1 }, err => {
-      if (err) statusEl.textContent = 'QR yaratmaq alınmadı';
-    });
-    document.getElementById('qrModal').style.display = 'flex';
-  }
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Kaydediliyor…';
 
-  function closeQrModal() {
-    document.getElementById('qrModal').style.display = 'none';
-  }
-
-  // ---- Kamera ilə QR oxumaq ----
-  let html5QrScanner = null;
-
-  function openScanner() {
-    document.getElementById('scanModal').style.display = 'flex';
-    html5QrScanner = new Html5Qrcode('reader');
-    html5QrScanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: 220 },
-      decodedText => {
-        document.getElementById('peerIdInput').value = decodedText.trim();
-        closeScanner();
-        connectToPeer();
-      },
-      () => {}
-    ).catch(() => {
-      statusEl.textContent = 'Kameraya icazə verilmədi';
-      closeScanner();
-    });
-  }
-
-  function closeScanner() {
-    document.getElementById('scanModal').style.display = 'none';
-    if (html5QrScanner) {
-      html5QrScanner.stop().then(() => html5QrScanner.clear()).catch(() => {});
-      html5QrScanner = null;
+  try{
+    if(editingId){
+      const updated = await updateAppRow(editingId, {
+        name, project_id: projectId, api_key: apiKey, table_name: table
+      });
+      const idx = apps.findIndex(a => a.id === editingId);
+      apps[idx] = updated;
+    } else {
+      const row = await insertAppRow({
+        name, project_id: projectId, api_key: apiKey, table_name: table,
+        last_updated: new Date().toISOString()
+      });
+      apps.push(row);
     }
+    closeModal();
+    render();
+    showToast('Kaydedildi');
+  }catch(err){
+    showToast('Kaydetme başarısız: ' + err.message, true);
+  }finally{
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Kaydet';
+  }
+}
+
+// ---------- SQL modal ----------
+function openSqlModal(){ document.getElementById('sqlOverlay').classList.add('open'); }
+function closeSqlModal(){ document.getElementById('sqlOverlay').classList.remove('open'); }
+document.getElementById('sqlOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'sqlOverlay') closeSqlModal();
+});
+function copySql(boxId){
+  const text = document.getElementById(boxId).innerText.replace('Kopyala','').trim();
+  navigator.clipboard.writeText(text).then(() => showToast('SQL kopyalandı'));
+}
+
+function showToast(msg, isError = false){
+  const wrap = document.getElementById('toastWrap');
+  const t = document.createElement('div');
+  t.className = 'toast' + (isError ? ' error' : '');
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+// ---------- Ping a tracked app's own Supabase project ----------
+async function pingSupabase(app){
+  const base = `https://${app.project_id}.supabase.co/rest/v1/${app.table_name}`;
+  const headers = {
+    'apikey': app.api_key,
+    'Authorization': `Bearer ${app.api_key}`,
+    'Content-Type': 'application/json',
+  };
+  const insertRes = await fetch(base, {
+    method:'POST',
+    headers: {...headers, 'Prefer':'return=representation'},
+    body: JSON.stringify({})
+  });
+  if(!insertRes.ok){
+    const errText = await insertRes.text();
+    throw new Error(`Insert başarısız (${insertRes.status}): ${errText.slice(0,120)}`);
+  }
+  const rows = await insertRes.json();
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  if(row && row.id !== undefined){
+    await fetch(`${base}?id=eq.${row.id}`, { method:'DELETE', headers });
+  }
+  return true;
+}
+
+async function updateApp(id){
+  const app = apps.find(a => a.id === id);
+  if(!app) return;
+  const btn = document.getElementById('btn-'+id);
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6"/></svg> Güncelleniyor`;
+
+  try{
+    await pingSupabase(app);
+    const nowIso = new Date().toISOString();
+    const updated = await updateAppRow(id, { last_updated: nowIso });
+    const idx = apps.findIndex(a => a.id === id);
+    apps[idx] = updated;
+    render();
+    showToast(`${app.name} güncellendi ✓`);
+  }catch(err){
+    showToast(`${app.name}: ${err.message}`, true);
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+}
+
+async function bulkUpdate(){
+  if(apps.length === 0){ showToast('Önce bir uygulama ekle', true); return; }
+  const fab = document.getElementById('bulkBtn');
+  const label = document.getElementById('bulkBtnLabel');
+  fab.disabled = true;
+  let ok = 0, fail = 0;
+
+  for(const app of apps){
+    label.textContent = `${app.name} güncelleniyor…`;
+    try{
+      await pingSupabase(app);
+      const updated = await updateAppRow(app.id, { last_updated: new Date().toISOString() });
+      const idx = apps.findIndex(a => a.id === app.id);
+      apps[idx] = updated;
+      ok++;
+    }catch(e){
+      fail++;
+    }
+    render();
   }
 
-  function connectToPeer() {
-    const id = document.getElementById('peerIdInput').value.trim();
-    if (!id) return;
-    conn = peer.connect(id);
-    conn.on('open', () => setupConnection());
+  label.textContent = 'Tümünü Güncelle';
+  fab.disabled = false;
+  showToast(`Bitti: ${ok} başarılı${fail ? ', ' + fail + ' başarısız' : ''}`, fail > 0);
+}
+
+// ---------- Boot ----------
+async function boot(){
+  setConn('connecting');
+  try{
+    apps = await fetchApps();
+    setConn('ok');
+    document.getElementById('loadingState').style.display = 'none';
+    render();
+  }catch(err){
+    setConn('bad');
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('grid').style.display = 'grid';
+    document.getElementById('grid').innerHTML = '';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyState').innerHTML = `
+      <h2>Supabase'e bağlanılamadı</h2>
+      <p>${escapeHtml(err.message)}<br>Sağ üstteki <b>SQL</b> butonundan "1) Bu panelin kendi projesinde" script'ini çalıştırdığından emin ol, sonra sayfayı yenile.</p>
+    `;
+    renderStats();
   }
+}
 
-  function setupConnection() {
-    chatArea.style.display = 'flex';
-    setupEl.style.display = 'none';
-    statusEl.textContent = '✅ Qoşuldu: ' + conn.peer;
-    addSysMsg('Bağlantı quruldu, danışa bilərsən.');
-
-    conn.on('data', data => {
-      addMsg(data, 'them');
-    });
-
-    conn.on('close', () => {
-      statusEl.textContent = '❌ Bağlantı kəsildi';
-      addSysMsg('Qarşı tərəf ayrıldı.');
-    });
-  }
-
-  function sendMsg() {
-    const input = document.getElementById('msgInput');
-    const text = input.value.trim();
-    if (!text || !conn || !conn.open) return;
-    conn.send(text);
-    addMsg(text, 'me');
-    input.value = '';
-  }
-
-  function addMsg(text, cls) {
-    const div = document.createElement('div');
-    div.className = 'msg ' + cls;
-    div.textContent = text;
-    messagesEl.appendChild(div);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-
-  function addSysMsg(text) {
-    const div = document.createElement('div');
-    div.className = 'sys';
-    div.textContent = text;
-    messagesEl.appendChild(div);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
+setInterval(() => { if(apps.length) render(); }, 60000);
+boot();
 </script>
-
 </body>
 </html>
